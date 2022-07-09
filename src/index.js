@@ -4,9 +4,7 @@ import ReactDOM from 'react-dom';
 import { AppWrap } from 'components/App';
 
 ReactDOM.render(
-  <React.StrictMode>
-    <AppWrap />
-  </React.StrictMode>,
+  <AppWrap />,
   document.getElementById('root')
 );
 

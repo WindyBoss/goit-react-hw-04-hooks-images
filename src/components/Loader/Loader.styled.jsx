@@ -1,7 +1,8 @@
 import styled from 'styled-components';
 
-export const LoaderContainer = styled.ul`
-display: flex;
-justify-content: center;
-align-items: center;
+export const LoaderContainer = styled.div`
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: transparent;
 `;

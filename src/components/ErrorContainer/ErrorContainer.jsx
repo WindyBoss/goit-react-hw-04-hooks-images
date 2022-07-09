@@ -1,15 +1,19 @@
+import PropTypes from 'prop-types';
 
-import { BiError } from 'react-icons/bi';
+import { ErrorLabel, iconStyle } from './ErrorContainer.styled';
+import ErrorOutlineTwoToneIcon from '@mui/icons-material/ErrorOutlineTwoTone';
 
-import { ErrorLabel } from './ErrorContainer.styled';
-
-export default function ErrorContainer () {
+export default function ErrorContainer ({errorMessage}) {
   return (
     <>
-      <BiError />
+      <ErrorOutlineTwoToneIcon sx={iconStyle}/>
       <ErrorLabel>
-        Sorry, I did not find the result of your search, please text valide tags
+        {errorMessage}
       </ErrorLabel>
     </>
   );
-  };
+};
+
+ErrorContainer.propTypes = {
+  errorMessage: PropTypes.string.isRequired,
+};

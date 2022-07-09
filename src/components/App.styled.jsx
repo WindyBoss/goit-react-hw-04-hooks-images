@@ -18,4 +18,6 @@ export const CommunicationContainer = styled.div`
     font-size: 30px;
     height: 100vh;
 `;
-
+export const Image = styled.img`
+  width: 100%;
+`;

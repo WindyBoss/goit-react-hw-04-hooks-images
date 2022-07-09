@@ -1,17 +1,20 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
+import LazyLoad from 'react-lazyload';
 
 import { ApiService } from '../ApiService/ApiService';
 import { withApiState } from './ApiState';
 
 import Searchbar from './Searchbar';
-import ImageGallery from './ImageGallery';
+import GalleryRender from './ImageGallery/GalleryRender';
+import Modal from './Modal';
 import LoadMoreBtn from './LoadMoreButton';
 import Loader from './Loader';
 import ErrorContainer from './ErrorContainer';
 
-import { GalleryContainer, CommunicationContainer } from './App.styled';
+import { useModal } from 'Hooks/useModal';
 
+import { GalleryContainer, CommunicationContainer, Image } from './App.styled';
 
 const notify = (message) => toast(message,
   {
@@ -19,127 +22,95 @@ const notify = (message) => toast(message,
       borderRadius: '10px',
       background: '#3f51b5',
       color: '#fff',
-      position: "bottom-right",
+      duration: 5000,
+      fontSize: '20px',
+      padding: '10px 20px 10px 20px',
+      maxWidth: '100%',
     },
   });
 
-const INITIAL_VALUE = {
-  keyword: '',
-  response: {},
-  page: 1,
-  endRow: false,
-};
+function App ({ apiState }) {
+  const [openModal, toggleModal] = useModal();
 
-class App extends Component {
+  const [keyword, setKeyword] = useState('');
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [endRow, setEndRow] = useState(false);
+  const [error, setError] = useState();
+  const [clickedImg, setClickedImg] = useState({});
+  const [perPage, setPerPage] = useState(0);
 
-  state = INITIAL_VALUE;
-
-
-  makeSearch = async (searchKeyword) => {
-    const { keyword  } = this.state;
-    const { apiState } = this.props;
-    const { page } = INITIAL_VALUE;
-
-    this.setState({ page: page });
-
-    if (keyword === searchKeyword) {
-        return;
+  useEffect(() => {
+    const makeSearch = async () => {
+    if (keyword === '' || keyword.trim() === '') {
+      notify('Text Something');
+      return;
     };
-
     apiState.pending();
-
     try {
-      this.getError(searchKeyword.trim() === '');
-      const response = await ApiService(searchKeyword, page);
-      this.getError(response.hits.length === 0);
-
-      if (response.hits.length < 20) {
-        this.setState({response: response, keyword: searchKeyword, page: page + 1, endRow: true});
+      const response = await ApiService(keyword, page, perPage);
+      if (response.hits.length === 0) {
+        notify('Text valid search')
+        throw new Error('No search on your request');
+      };  
+      if (response.hits.length < 20 && response.hits.length > 0) {
+        setEndRow(true);
         notify('Sorry, You have reached the limit of pictures');
+      }; 
+      if(page > 1) {
+        setImages(prevImg => [...prevImg, ...response.hits]);
       } else {
-        this.setState({response: response, keyword: searchKeyword, page: page + 1, endRow: false});
+        setImages(response.hits);
       };
-
       apiState.success();
-
     } catch (error) {
+      setError(error.message)
       apiState.error();
     };
   };
+  makeSearch();
+  },[apiState, keyword, page, perPage])
 
-  onLoadMoreClick = async () => {
-    const { page, keyword } = this.state;
-    const { apiState } = this.props;
-    apiState.pending();
+  const onLoadMoreClick = () => {
+    setPage(prevP => prevP + 1)
+  };
 
-    try {
-      const response = await ApiService(keyword, page);
+  const makeNewSearch = (searchQuery) => {
+    setKeyword(searchQuery);
+    setPage(1);
+    setEndRow(false);
+  }
 
-      if (response.hits.length < 20) {
-        this.setState({ endRow: true, response: response, page: page + 1 });
-        notify('Sorry, You have reached the limit of pictures');
-      } else {
-        this.setState({ response: response, page: page + 1 })
-      };
-
-      apiState.success();
-
-    } catch (error) {
-      apiState.error();
+  const findClickedImg = (id) => {
+    if(images.length > 0 && id) {
+      const clickedImg = images.filter((img => img.id === id))[0];
+      setClickedImg(clickedImg);
     };
+    toggleModal();
   };
 
-  getError(error) {
-      if (error) {
-        throw new Error();
-      };
-  };
+  return (
+    <>
+      <Searchbar onClick={makeNewSearch} pictureToLoad={perPage} onSelect={setPerPage}/>
+      { openModal && (
+        <Modal onClick={toggleModal}>
+          <LazyLoad>
+            <Image src={clickedImg.largeImageURL} alt={clickedImg.tags} />
+          </LazyLoad>
+        </Modal>
+      )}
 
-  render() {
-    const { response, page, endRow } = this.state;
-    const { apiState } = this.props;
-
-    const loadFirstTime = apiState.isPending() && page === 1;
-    const loadedPages = apiState.isPending() && page > 1;
-    
-    return (
-
-      <>
-        <Searchbar onClick={this.makeSearch} />
-
-        {
-          apiState.isIdle() &&
-          <CommunicationContainer>
-            Text the tags to find gallery
-          </CommunicationContainer>
-        }
-
-        <Loader condition={loadFirstTime} />
-
-        {(
-          apiState.isSuccess() || loadedPages) && (
-            <GalleryContainer>
-              <ImageGallery response={response} pageNumber={page - 1} />
-              {!endRow && (
-                <LoadMoreBtn onClick={this.onLoadMoreClick} condition={apiState.isPending} loading={'loading'} />
-              )}
-            </GalleryContainer>
-          )}
-
-        {
-          apiState.isError() &&
-          <CommunicationContainer>
-            <ErrorContainer />
-          </CommunicationContainer>
-        }
-
-        <Toaster
-          position="top-right"
-          reverseOrder={false}
-        />
-      </>
-    );
-  };
+      { apiState.isIdle() && <CommunicationContainer>Text the tags to find gallery</CommunicationContainer> }
+      { apiState.isError() && <CommunicationContainer><ErrorContainer errorMessage={error}/></CommunicationContainer> }
+      { ( apiState.isPending() && page === 1 )  && <Loader height='400px' width='400px' color='#3f51b5'/> }
+      { ( apiState.isSuccess() || (apiState.isPending() && page > 1)) && ( 
+        <GalleryContainer>
+          <GalleryRender images={images} onClick={findClickedImg} page={page - 1}/>
+          { !endRow && <LoadMoreBtn onClick={onLoadMoreClick} condition={apiState.isPending} loading={'loading'} /> }
+        </GalleryContainer>)}
+      <Toaster position="bottom-left" reverseOrder={false}/>
+    </>
+  );
 };
 
 export const AppWrap = withApiState(App);
